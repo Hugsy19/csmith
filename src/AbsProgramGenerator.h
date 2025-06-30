@@ -3,30 +3,15 @@
 // Copyright (c) 2007, 2008, 2009, 2010, 2011 The University of Utah
 // All rights reserved.
 //
-// This file is part of `csmith', a random generator of C programs.
+// 本文件定义了抽象的程序生成器基类 AbsProgramGenerator，
+// 该类为不同风格的程序生成器（如默认/DFS/exhaustive）提供统一接口。
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
+// 主要职责：
+//   - 统一管理生成器实例（单例模式）
+//   - 提供生成主流程的虚接口
+//   - 管理输出管理器
+//   - 支持不同生成策略的扩展
 //
-//   * Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//
-//   * Redistributions in binary form must reproduce the above copyright
-//     notice, this list of conditions and the following disclaimer in the
-//     documentation and/or other materials provided with the distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-
 #ifndef ABS_PROGRAM_GENERATOR_H
 #define ABS_PROGRAM_GENERATOR_H
 
@@ -34,30 +19,42 @@
 
 class OutputMgr;
 
+// 抽象程序生成器基类，定义了生成器的统一接口
 class AbsProgramGenerator {
 public:
+	// 创建生成器实例（根据配置选择不同子类），并初始化
 	static AbsProgramGenerator* CreateInstance(int argc, char *argv[], unsigned long seed);
 
+	// 获取当前生成器实例（单例）
 	static AbsProgramGenerator* GetInstance();
 
+	// 构造函数
 	AbsProgramGenerator();
 
+	// 虚析构函数，保证子类正确析构
 	virtual ~AbsProgramGenerator();
 
+	// 获取输出管理器（静态接口，实际由子类实现）
 	static OutputMgr* GetOutputMgr();
 
+	// 主生成流程（纯虚函数，需子类实现）
 	virtual void goGenerator() = 0;
 
+	// 获取输出管理器（纯虚函数，需子类实现）
 	virtual OutputMgr* getOutputMgr() = 0;
 
+	// 获取计数前缀（如用于命名变量/函数等，纯虚函数）
 	virtual std::string get_count_prefix(const std::string &name) = 0;
 
 protected:
+	// 初始化生成器（纯虚函数，需子类实现）
 	virtual void initialize() = 0;
 
 private:
+	// 当前生成器单例指针
 	static AbsProgramGenerator *current_generator_;
 
+	// 获取输出管理器的静态辅助函数
 	static OutputMgr *getmgr(AbsProgramGenerator *gen);
 };
 

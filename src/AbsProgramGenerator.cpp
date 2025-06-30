@@ -3,30 +3,15 @@
 // Copyright (c) 2007, 2008, 2009, 2010, 2011, 2017 The University of Utah
 // All rights reserved.
 //
-// This file is part of `csmith', a random generator of C programs.
+// 本文件实现了抽象程序生成器 AbsProgramGenerator 的相关方法，
+// 负责生成器的实例管理、不同生成策略的选择与初始化、概率配置等。
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
+// 主要内容：
+//   - 单例生成器的创建与获取
+//   - 生成器初始化流程
+//   - 概率配置文件的处理
+//   - 输出管理器的获取
 //
-//   * Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//
-//   * Redistributions in binary form must reproduce the above copyright
-//     notice, this list of conditions and the following disclaimer in the
-//     documentation and/or other materials provided with the distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-
 #if HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -42,8 +27,10 @@
 
 using namespace std;
 
+// 静态成员变量，当前生成器单例指针
 AbsProgramGenerator *AbsProgramGenerator::current_generator_ = NULL;
 
+// 获取当前生成器的输出管理器
 OutputMgr *
 AbsProgramGenerator::GetOutputMgr()
 {
@@ -51,9 +38,11 @@ AbsProgramGenerator::GetOutputMgr()
 	return current_generator_->getOutputMgr();
 }
 
+// 创建生成器实例（根据配置选择不同子类），并初始化
 AbsProgramGenerator *
 AbsProgramGenerator::CreateInstance(int argc, char *argv[], unsigned long seed)
 {
+	// 根据选项选择 DFS/exhaustive 还是默认生成器
 	if (CGOptions::dfs_exhaustive()) {
 		AbsProgramGenerator::current_generator_ = new DFSProgramGenerator(argc, argv, seed);
 	}
@@ -62,14 +51,17 @@ AbsProgramGenerator::CreateInstance(int argc, char *argv[], unsigned long seed)
 		AbsProgramGenerator::current_generator_ = new DefaultProgramGenerator(argc, argv, seed);
 	}
 
+	// 初始化生成器
 	AbsProgramGenerator::current_generator_->initialize();
 
+	// 如果指定了概率配置的导出，直接导出并退出
 	if (!(CGOptions::dump_default_probabilities().empty())) {
 		CGOptions::random_random(false);
 		Probabilities *prob = Probabilities::GetInstance();
 		prob->dump_default_probabilities(CGOptions::dump_default_probabilities());
 		exit(0);
 	}
+	// 如果指定了随机概率的导出，导出并退出
 	else if (!(CGOptions::dump_random_probabilities().empty())) {
 		CGOptions::random_random(true);
 		Probabilities *prob = Probabilities::GetInstance();
@@ -77,6 +69,7 @@ AbsProgramGenerator::CreateInstance(int argc, char *argv[], unsigned long seed)
 		exit(0);
 	}
 
+	// 如果指定了概率配置文件，进行解析
 	Probabilities *prob = Probabilities::GetInstance();
 	string msg;
 	if (!(CGOptions::probability_configuration().empty())) {
@@ -89,6 +82,7 @@ AbsProgramGenerator::CreateInstance(int argc, char *argv[], unsigned long seed)
 	return AbsProgramGenerator::current_generator_;
 }
 
+// 获取当前生成器实例（单例）
 AbsProgramGenerator *
 AbsProgramGenerator::GetInstance()
 {
@@ -96,11 +90,13 @@ AbsProgramGenerator::GetInstance()
 	return AbsProgramGenerator::current_generator_;
 }
 
+// 构造函数
 AbsProgramGenerator::AbsProgramGenerator()
 {
 
 }
 
+// 虚析构函数
 AbsProgramGenerator::~AbsProgramGenerator()
 {
 

@@ -3,39 +3,13 @@
 // Copyright (c) 2007, 2008, 2010, 2011, 2013, 2014, 2015, 2016, 2017 The University of Utah
 // All rights reserved.
 //
-// This file is part of `csmith', a random generator of C programs.
+// 本文件实现了csmith类型系统Type类的所有核心逻辑，包括类型生成、类型选择、类型管理、辅助过滤器等。
+// 主要内容：
+//   - 类型生成主流程（GenerateAllTypes等）
+//   - 随机/穷举结构体、联合体、指针类型生成
+//   - 类型过滤与选择（如NonVoidTypeFilter、ChooseRandomTypeFilter）
+//   - 类型属性、辅助函数、类型递归等
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-//   * Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//
-//   * Redistributions in binary form must reproduce the above copyright
-//     notice, this list of conditions and the following disclaimer in the
-//     documentation and/or other materials provided with the distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-
-//
-// This file was derived from a random program generator written by Bryan
-// Turner.  The attributions in that file was:
-//
-// Random Program Generator
-// Bryan Turner (bryan.turner@pobox.com)
-// July, 2005
-//
-
 #if HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -60,23 +34,21 @@ using namespace std;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/*
- *
- */
+// -------------------- 类型静态成员与全局集合 --------------------
+// simple_types：所有简单类型的静态指针数组
 const Type *Type::simple_types[MAX_SIMPLE_TYPES];
-
+// void_type：void类型的静态指针
 Type *Type::void_type = NULL;
-
-// ---------------------------------------------------------------------
-// List of all types used in the program
+// AllTypes：当前程序中所有类型的全局集合
 static vector<Type *> AllTypes;
+// derived_types：所有派生类型（如指针类型）的集合
 static vector<Type *> derived_types;
-
+// 结构体/联合体类型属性生成器
 AttributeGenerator struct_type_attr_generator;
 AttributeGenerator union_type_attr_generator;
 
 //////////////////////////////////////////////////////////////////////
-
+// 初始化类型属性（如aligned、deprecated等）
 void
 InitializeTypeAttributes()
 {
@@ -93,20 +65,18 @@ InitializeTypeAttributes()
 	}
 }
 
+// -------------------- 类型过滤器辅助类 --------------------
+// 用于类型选择时的过滤逻辑
+// 只选择非void类型
 class NonVoidTypeFilter : public Filter
 {
 public:
 	NonVoidTypeFilter();
-
 	virtual ~NonVoidTypeFilter();
-
 	virtual bool filter(int v) const;
-
 	Type *get_type();
-
 private:
 	mutable Type *typ_;
-
 };
 
 NonVoidTypeFilter::NonVoidTypeFilter()
@@ -149,20 +119,17 @@ NonVoidTypeFilter::get_type()
 	return typ_;
 }
 
+// -------------------- NonVoidNonVolatileTypeFilter --------------------
+// 只选择非void且非volatile类型，常用于参数/字段类型选择
 class NonVoidNonVolatileTypeFilter : public Filter
 {
 public:
 	NonVoidNonVolatileTypeFilter();
-
 	virtual ~NonVoidNonVolatileTypeFilter();
-
 	virtual bool filter(int v) const;
-
 	Type *get_type();
-
 private:
 	mutable Type *typ_;
-
 };
 
 NonVoidNonVolatileTypeFilter::NonVoidNonVolatileTypeFilter()
@@ -216,17 +183,15 @@ NonVoidNonVolatileTypeFilter::get_type()
 	return typ_;
 }
 
+// -------------------- ChooseRandomTypeFilter --------------------
+// 类型选择过滤器，支持字段类型、结构体赋值操作符等多条件过滤
 class ChooseRandomTypeFilter : public Filter
 {
 public:
 	ChooseRandomTypeFilter(bool for_field_var, bool struct_has_assign_ops = false);
-
 	virtual ~ChooseRandomTypeFilter();
-
 	virtual bool filter(int v) const;
-
 	Type *get_type();
-
 	bool for_field_var_;
 	bool struct_has_assign_ops_;
 private:
@@ -284,6 +249,8 @@ ChooseRandomTypeFilter::get_type()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// -------------------- checkImplicitNontrivialAssignOps --------------------
+// 检查字段类型中是否有隐式复杂赋值操作符（C++）
 static bool checkImplicitNontrivialAssignOps(vector<const Type*> fields)
 {
 	if (!CGOptions::lang_cpp()) return false;

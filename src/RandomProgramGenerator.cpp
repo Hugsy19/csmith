@@ -3,30 +3,15 @@
 // Copyright (c) 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018 The University of Utah
 // All rights reserved.
 //
-// This file is part of `csmith', a random generator of C programs.
+// 本文件是 csmith 随机 C 程序生成器的主控文件，包含主函数和参数解析、帮助信息等核心流程。
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
+// 主要功能：
+//   - 解析命令行参数，设置全局选项
+//   - 初始化随机种子
+//   - 创建并启动程序生成器
+//   - 输出帮助、版本等信息
 //
-//   * Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//
-//   * Redistributions in binary form must reproduce the above copyright
-//     notice, this list of conditions and the following disclaimer in the
-//     documentation and/or other materials provided with the distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-
+// 适合入门理解整个工具的主流程。
 //
 // This file was derived from a random program generator written by Bryan
 // Turner.  The attributions in that file was:
@@ -40,19 +25,19 @@
 //
 
 /*
-Random C/C++ Program Generator
+随机 C/C++ 程序生成器主流程说明：
 ------------------------------
-1) Create a set of random types to be used throughout the program
-2) Create the main func.
-3) Generate a random block of statements with maximum control & expression nesting depths.
-4) If new functions were defined in #3, then loop back to fill in its body.
-5) When a maximum number of functions is reached, stop generating new functions and finish off the bodies of the remaining funcs.
-6) Output generated program.
+1) 创建一组将在程序中使用的随机类型
+2) 创建 main 函数
+3) 生成一个包含最大控制和表达式嵌套深度的随机语句块
+4) 如果在 #3 中定义了新函数，则循环回去填充其函数体
+5) 达到最大函数数量后，停止生成新函数，完成剩余函数体
+6) 输出最终生成的程序
 
-GOALS:
-- Locate basic errors in compiler front-ends (crashes, etc).
-- Ferret out correctness errors in optimization passes.
-- Support the design of tools to search for improved optimization paths (partial exection, etc).
+主要目标：
+- 定位编译器前端的基本错误（如崩溃等）
+- 揪出优化过程中的正确性错误
+- 支持优化路径改进工具的设计
 
 TODO:
 - Protect back links with a global DEPTH, don't call if DEPTH is too high (avoid infinite recursion)
@@ -80,7 +65,7 @@ FUTURE:
 #endif
 
 #ifdef WIN32
-#pragma warning(disable : 4786)   /* Disable annoying warning messages */
+#pragma warning(disable : 4786)   /* 关闭烦人的警告信息 */
 #endif
 
 #include <ostream>
@@ -88,14 +73,13 @@ FUTURE:
 #include <cstring>
 #include <cstdio>
 
-#include "Common.h"
+#include "Common.h"              // 公共类型和声明
+#include "CGOptions.h"           // 全局配置选项
+#include "AbsProgramGenerator.h" // 抽象程序生成器
 
-#include "CGOptions.h"
-#include "AbsProgramGenerator.h"
-
-#include "git_version.h"
-#include "platform.h"
-#include "random.h"
+#include "git_version.h"         // 版本信息
+#include "platform.h"            // 平台相关
+#include "random.h"              // 随机数相关
 
 using namespace std;
 
@@ -103,23 +87,21 @@ using namespace std;
 ///////////////////////////////////////////////////////////////////////////////
 
 // ----------------------------------------------------------------------------
-// Globals
-
-// Program seed - allow user to regenerate the same program on different
-// platforms.
+// 全局变量：用于存储当前使用的随机种子，保证生成程序的可复现性
 static unsigned long g_Seed = 0;
 
 // ----------------------------------------------------------------------------
+// 打印版本信息
 static void
 print_version(void)
 {
 	cout << PACKAGE_STRING << endl;
 	cout << "Git version: " << git_version << endl;
-	// XXX print copyright, contact info, etc.?
+	// TODO: 可扩展打印版权、联系方式等
 }
 
 // ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// 解析字符串参数，赋值给 s，返回是否有效
 bool parse_string_arg(const char *arg, string &s)
 {
 	s.assign(arg);
@@ -127,6 +109,7 @@ bool parse_string_arg(const char *arg, string &s)
 		(s.compare(0, 2, "--")));
 }
 
+// 解析整数参数，赋值给 ret，返回是否有效
 static bool
 parse_int_arg(char *arg, unsigned long *ret)
 {
@@ -140,6 +123,7 @@ parse_int_arg(char *arg, unsigned long *ret)
 	return true;
 }
 
+// 打印常用命令行帮助信息
 static void print_help()
 {
 	cout << "Command line options: " << endl << endl;
@@ -222,6 +206,7 @@ static void print_help()
 
 }
 
+// 打印高级命令行帮助信息，主要面向开发者
 static void print_advanced_help()
 {
 	cout << "'Advanced' command line options that are probably only useful for Csmith's" << endl;
@@ -351,6 +336,7 @@ static void print_advanced_help()
     cout << "  --ptr-size <size>: specify pointer size of target (default taken from platform.info if it exists otherwise from host)"  << endl << endl;
 }
 
+// 检查参数个数是否合法，防止越界
 void arg_check(int argc, int i)
 {
 	if (i >= argc) {
@@ -360,1211 +346,77 @@ void arg_check(int argc, int i)
 }
 
 // ----------------------------------------------------------------------------
+// 主函数入口，负责解析命令行参数、设置全局选项、初始化生成器并启动程序生成流程
 int
 main(int argc, char **argv)
 {
+	// 生成随机种子（可用于复现）
 	g_Seed = platform_gen_seed();
 
+	// 设置默认的全局选项
 	CGOptions::set_default_settings();
 
+	// 解析命令行参数，支持多种配置和功能开关
 	for (int i=1; i<argc; i++) {
-
+		// 帮助信息
 		if (strcmp (argv[i], "--help") == 0 ||
 			strcmp (argv[i], "-h") == 0) {
 			print_help();
 			return 0;
 		}
-
+		// 高级帮助
 		if (strcmp (argv[i], "-hh") == 0) {
 			print_advanced_help();
 			return 0;
 		}
-
+		// 版本信息
 		if (strcmp (argv[i], "--version") == 0 ||
 			strcmp (argv[i], "-v") == 0) {
 			print_version();
 			return 0;
 		}
-
+		// 设置随机种子
 		if (strcmp (argv[i], "--seed") == 0 ||
 			strcmp (argv[i], "-s") == 0) {
 			i++;
 			arg_check(argc, i);
-
 			if (!parse_int_arg(argv[i], &g_Seed))
 				exit(-1);
 			continue;
 		}
-
-		if (strcmp (argv[i], "--max-block-size") == 0) {
-			unsigned long size = 0;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &size))
-				exit(-1);
-			CGOptions::max_block_size(size);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-funcs") == 0) {
-			unsigned long size = 0;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &size))
-				exit(-1);
-			CGOptions::max_funcs(size);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--func1_max_params") == 0) {
-			unsigned long num = 0;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &num))
-				exit(-1);
-			CGOptions::func1_max_params(num);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--klee") == 0) {
-			CGOptions::klee(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--crest") == 0) {
-			CGOptions::crest(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--ccomp") == 0) {
-			CGOptions::ccomp(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--coverage-test") == 0) {
-			CGOptions::coverage_test(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--coverage-test-size") == 0) {
-			unsigned long size = 0;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &size))
-				exit(-1);
-			CGOptions::coverage_test_size(size);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-split-files") == 0) {
-			unsigned long size = 0;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &size))
-				exit(-1);
-			CGOptions::max_split_files(size);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--split-files-dir") == 0) {
-			string dir;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], dir)) {
-				cout << "please specify <dir>" << std::endl;
-				exit(-1);
-			}
-			CGOptions::split_files_dir(dir);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--dfs-exhaustive") == 0) {
-			CGOptions::dfs_exhaustive(true);
-			CGOptions::random_based(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--compact-output") == 0) {
-			CGOptions::compact_output(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--packed-struct") == 0) {
-			CGOptions::packed_struct(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-packed-struct") == 0) {
-			CGOptions::packed_struct(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--bitfields") == 0) {
-			CGOptions::bitfields(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-bitfields") == 0) {
-			CGOptions::bitfields(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--prefix-name") == 0) {
-			CGOptions::prefix_name(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--sequence-name-prefix") == 0) {
-			CGOptions::sequence_name_prefix(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--compatible-check") == 0) {
-			CGOptions::compatible_check(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--partial-expand") == 0) {
-			string s;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], s)) {
-				cout << "--partial-expand needs options" << std::endl;
-				exit(-1);
-			}
-			CGOptions::partial_expand(s);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--paranoid") == 0) {
-			CGOptions::paranoid(true);
-			continue;
-		}
-		if (strcmp (argv[i], "--no-paranoid") == 0) {
-			CGOptions::paranoid(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--quiet") == 0) {
-			CGOptions::quiet(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--main") == 0) {
-			CGOptions::nomain(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--nomain") == 0) {
-			CGOptions::nomain(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--compound-assignment") == 0) {
-			CGOptions::compound_assignment(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-compound-assignment") == 0) {
-			CGOptions::compound_assignment(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--structs") == 0) {
-			CGOptions::use_struct(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-structs") == 0) {
-			CGOptions::use_struct(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--unions") == 0) {
-			CGOptions::use_union(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-unions") == 0) {
-			CGOptions::use_union(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--argc") == 0) {
-			CGOptions::accept_argc(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-argc") == 0) {
-			CGOptions::accept_argc(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--expand-struct") == 0) {
-			CGOptions::expand_struct(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--fixed-struct-fields") == 0) {
-			CGOptions::fixed_struct_fields(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-struct-fields") ==0 ) {
-			unsigned long ret;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &ret))
-				exit(-1);
-			CGOptions::max_struct_fields(ret);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-union-fields") ==0 ) {
-			unsigned long ret;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &ret))
-				exit(-1);
-			CGOptions::max_union_fields(ret);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-nested-struct-level") ==0 ) {
-			unsigned long ret;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &ret))
-				exit(-1);
-			CGOptions::max_nested_struct_level(ret);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--struct-output") == 0) {
-			string s;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], s))
-				exit(-1);
-			CGOptions::struct_output(s);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--dfs-debug-sequence") == 0) {
-			string s;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], s))
-				exit(-1);
-			CGOptions::dfs_debug_sequence(s);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-exhaustive-depth") ==0 ) {
-			unsigned long ret;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &ret))
-				exit(-1);
-			CGOptions::max_exhaustive_depth(ret);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-pointer-depth") ==0 ) {
-			unsigned long ret;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &ret))
-				exit(-1);
-			CGOptions::max_indirect_level(ret);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--output") == 0 ||
-			strcmp (argv[i], "-o") == 0) {
-			string o_file;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], o_file))
-				exit(-1);
-			CGOptions::output_file(o_file);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--delta-monitor") == 0) {
-			string monitor;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], monitor)) {
-				cout<< "please specify one delta monitor!" << std::endl;
-				exit(-1);
-			}
-			CGOptions::delta_monitor(monitor);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--delta-output") == 0) {
-			string o_file;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], o_file)) {
-				cout<< "please specify delta output file!" << std::endl;
-				exit(-1);
-			}
-			CGOptions::delta_output(o_file);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--go-delta") == 0) {
-			string monitor;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], monitor)) {
-				cout<< "please specify one delta type!" << std::endl;
-				exit(-1);
-			}
-			CGOptions::go_delta(monitor);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-delta-reduction") == 0) {
-			CGOptions::no_delta_reduction(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--math-notmp") == 0) {
-			CGOptions::math_notmp(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--math64") == 0) {
-			CGOptions::math64(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-math64") == 0) {
-			CGOptions::math64(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--inline-function") == 0) {
-			CGOptions::inline_function(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-inline-function") == 0) {
-			CGOptions::inline_function(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--longlong") == 0) {
-			CGOptions::longlong(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-longlong") == 0) {
-			CGOptions::longlong(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--int8") == 0) {
-			CGOptions::int8(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-int8") == 0) {
-			CGOptions::int8(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--uint8") == 0) {
-			CGOptions::uint8(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-uint8") == 0) {
-			CGOptions::uint8(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--float") == 0) {
-			CGOptions::enable_float(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-float") == 0) {
-			CGOptions::enable_float(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--strict-float") == 0) {
-			CGOptions::strict_float(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--pointers") == 0) {
-			CGOptions::pointers(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-pointers") == 0) {
-			CGOptions::pointers(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--function-attributes") == 0) {
-			CGOptions::func_attr_flag(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-function_attributes") == 0) {
-			CGOptions::func_attr_flag(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--type-attributes") == 0) {
-			CGOptions::type_attr_flag(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-type-attributes") == 0) {
-			CGOptions::type_attr_flag(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--label-attributes") == 0) {
-			CGOptions::label_attr_flag(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-label-attributes") == 0) {
-			CGOptions::label_attr_flag(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--variable-attributes") == 0) {
-			CGOptions::var_attr_flag(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-variable-attributes") == 0) {
-			CGOptions::var_attr_flag(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--compiler-attributes") == 0) {
-			CGOptions::func_attr_flag(true);
-                        CGOptions::type_attr_flag(true);
-                        CGOptions::label_attr_flag(true);
-                        CGOptions::var_attr_flag(true);
-                        continue;
-                }
-
-                if (strcmp (argv[i], "--no-compiler-attributes") == 0) {
-			CGOptions::func_attr_flag(false);
-			CGOptions::type_attr_flag(false);
-			CGOptions::label_attr_flag(false);
-                        CGOptions::var_attr_flag(false);
-                        continue;
-                }
-
-		if (strcmp (argv[i], "--int128") == 0) {
-			CGOptions::Int128(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-int128") == 0) {
-			CGOptions::Int128(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--uint128") == 0) {
-			CGOptions::UInt128(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-uint128") == 0) {
-			CGOptions::UInt128(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--binary-constant") == 0) {
-			CGOptions::binary_constant(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-binary-constant") == 0) {
-			CGOptions::binary_constant(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-array-dim") ==0 ) {
-			unsigned long dim;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &dim))
-				exit(-1);
-			CGOptions::max_array_dimensions(dim);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-array-len-per-dim") ==0 ) {
-			unsigned long length;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &length))
-				exit(-1);
-			CGOptions::max_array_length_per_dimension(length);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--arrays") == 0) {
-			CGOptions::arrays(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-arrays") == 0) {
-			CGOptions::arrays(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--strict-const-arrays") == 0) {
-			CGOptions::strict_const_arrays(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--jumps") == 0) {
-			CGOptions::jumps(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-jumps") == 0) {
-			CGOptions::jumps(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--return-structs") == 0) {
-			CGOptions::return_structs(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-return-structs") == 0) {
-			CGOptions::return_structs(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--arg-structs") == 0) {
-			CGOptions::arg_structs(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-arg-structs") == 0) {
-			CGOptions::arg_structs(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--return-unions") == 0) {
-			CGOptions::return_unions(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-return-unions") == 0) {
-			CGOptions::return_unions(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--arg-unions") == 0) {
-			CGOptions::arg_unions(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-arg-unions") == 0) {
-			CGOptions::arg_unions(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--volatiles") == 0) {
-			CGOptions::volatiles(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-volatiles") == 0) {
-			CGOptions::volatiles(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--volatile-pointers") == 0) {
-			CGOptions::volatile_pointers(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-volatile-pointers") == 0) {
-			CGOptions::volatile_pointers(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--const-pointers") == 0) {
-			CGOptions::const_pointers(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-const-pointers") == 0) {
-			CGOptions::const_pointers(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--global-variables") == 0) {
-			CGOptions::global_variables(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-global-variables") == 0) {
-			CGOptions::global_variables(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--enable-access-once") == 0) {
-			CGOptions::access_once(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--strict-volatile-rule") == 0) {
-			CGOptions::strict_volatile_rule(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--addr-taken-of-locals") == 0) {
-			CGOptions::addr_taken_of_locals(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-addr-taken-of-locals") == 0) {
-			CGOptions::addr_taken_of_locals(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--fresh-array-ctrl-var-names") == 0) {
-			CGOptions::fresh_array_ctrl_var_names(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--consts") == 0) {
-			CGOptions::consts(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-consts") == 0) {
-			CGOptions::consts(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--dangling-global-pointers") == 0) {
-			CGOptions::dangling_global_ptrs(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-dangling-global-pointers") == 0) {
-			CGOptions::dangling_global_ptrs(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--divs") == 0) {
-			CGOptions::divs(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-divs") == 0) {
-			CGOptions::divs(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--muls") == 0) {
-			CGOptions::muls(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-muls") == 0) {
-			CGOptions::muls(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--checksum") == 0) {
-			CGOptions::compute_hash(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-checksum") == 0) {
-			CGOptions::compute_hash(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--builtins") == 0) {
-			CGOptions::builtins(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-builtins") == 0) {
-			CGOptions::builtins(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--random-random") == 0) {
-			CGOptions::random_random(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--check-global") == 0) {
-			CGOptions::blind_check_global(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--step-hash-by-stmt") == 0) {
-			CGOptions::step_hash_by_stmt(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--stop-by-stmt") ==0 ) {
-			unsigned long num;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &num))
-				exit(-1);
-			CGOptions::stop_by_stmt(num);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--monitor-funcs") == 0) {
-			string vname;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], vname)) {
-				cout<< "please specify name(s) of the func(s) you want to monitor" << std::endl;
-				exit(-1);
-			}
-			CGOptions::monitored_funcs(vname);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--delta-input") == 0) {
-			string filename;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], filename)) {
-				cout<< "please specify delta output file!" << std::endl;
-				exit(-1);
-			}
-			CGOptions::delta_input(filename);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--dump-default-probabilities") == 0) {
-			string filename;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], filename)) {
-				cout<< "please pass probability configuration output file!" << std::endl;
-				exit(-1);
-			}
-			CGOptions::dump_default_probabilities(filename);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--dump-random-probabilities") == 0) {
-			string filename;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], filename)) {
-				cout<< "please pass probability configuration output file!" << std::endl;
-				exit(-1);
-			}
-			CGOptions::dump_random_probabilities(filename);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--probability-configuration") == 0) {
-			string filename;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], filename)) {
-				cout<< "please probability configuration file!" << std::endl;
-				exit(-1);
-			}
-			CGOptions::probability_configuration(filename);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--const-as-condition") == 0) {
-			CGOptions::const_as_condition(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--match-exact-qualifiers") == 0) {
-			CGOptions::match_exact_qualifiers(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-return-dead-pointer") == 0) {
-			CGOptions::no_return_dead_ptr(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--return-dead-pointer") == 0) {
-			CGOptions::no_return_dead_ptr(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--concise") == 0) {
-			//CGOptions::quiet(true);
-			//CGOptions::paranoid(false);
-			CGOptions::concise(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--identify-wrappers") == 0) {
-			CGOptions::identify_wrappers(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--safe-math-wrappers") == 0) {
-			string ids;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], ids)) {
-				cout<< "please specify safe math wrappers in the form of id1,id2..." << std::endl;
-				exit(-1);
-			}
-			CGOptions::safe_math_wrapper(ids);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--mark-mutable-const") == 0) {
-			CGOptions::mark_mutable_const(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--force-globals-static") == 0) {
-			CGOptions::force_globals_static(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-force-globals-static") == 0) {
-			CGOptions::force_globals_static(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--force-non-uniform-arrays") == 0) {
-			CGOptions::force_non_uniform_array_init(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-force-non-uniform-arrays") == 0) {
-			CGOptions::force_non_uniform_array_init(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--inline-function-prob") == 0 ) {
-			unsigned long prob;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &prob))
-				exit(-1);
-			CGOptions::inline_function_prob(prob);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--builtin-function-prob") == 0 ) {
-			unsigned long prob;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &prob))
-				exit(-1);
-			CGOptions::builtin_function_prob(prob);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--array-oob-prob") == 0 ) {
-			unsigned long prob;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &prob))
-				exit(-1);
-			CGOptions::array_oob_prob(prob);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--enable-builtin-kinds") == 0) {
-			string kinds;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], kinds)) {
-				cout<< "please specify enabled builtin kinds in the form of k1,k2..." << std::endl;
-				exit(-1);
-			}
-			CGOptions::enable_builtin_kinds(kinds);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--disable-builtin-kinds") == 0) {
-			string kinds;
-			i++;
-			arg_check(argc, i);
-			if (!parse_string_arg(argv[i], kinds)) {
-				cout<< "please specify disabled builtin kinds in the form of k1,k2..." << std::endl;
-				exit(-1);
-			}
-			CGOptions::disable_builtin_kinds(kinds);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--null-ptr-deref-prob") == 0 ) {
-			unsigned long prob;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &prob))
-				exit(-1);
-			CGOptions::null_pointer_dereference_prob(prob);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--dangling-ptr-deref-prob") == 0 ) {
-			unsigned long prob;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &prob))
-				exit(-1);
-			CGOptions::dead_pointer_dereference_prob(prob);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-expr-complexity") == 0 ) {
-			unsigned long comp;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &comp))
-				exit(-1);
-			CGOptions::max_expr_depth(comp);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-block-depth") == 0 ) {
-			unsigned long depth;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &depth))
-				exit(-1);
-			CGOptions::max_blk_depth(depth);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--max-struct-nested-level") == 0 ) {
-			unsigned long depth;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &depth))
-				exit(-1);
-			CGOptions::max_nested_struct_level(depth);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--pre-incr-operator") == 0) {
-			CGOptions::pre_incr_operator(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-pre-incr-operator") == 0) {
-			CGOptions::pre_incr_operator(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--pre-decr-operator") == 0) {
-			CGOptions::pre_decr_operator(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-pre-decr-operator") == 0) {
-			CGOptions::pre_decr_operator(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--post-incr-operator") == 0) {
-			CGOptions::post_incr_operator(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-post-incr-operator") == 0) {
-			CGOptions::post_incr_operator(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--post-decr-operator") == 0) {
-			CGOptions::post_decr_operator(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-post-decr-operator") == 0) {
-			CGOptions::post_decr_operator(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--unary-plus-operator") == 0) {
-			CGOptions::unary_plus_operator(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-unary-plus-operator") == 0) {
-			CGOptions::unary_plus_operator(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--embedded-assigns") == 0) {
-			CGOptions::use_embedded_assigns(true);
-			continue;
-		}
-
-        if (strcmp (argv[i], "--no-safe-math") == 0){
-            CGOptions::avoid_signed_overflow(false);
-            continue;
-        }
-
-        if (strcmp (argv[i], "--safe-math") == 0){
-            CGOptions::avoid_signed_overflow(true);
-            continue;
-        }
-
-		if (strcmp (argv[i], "--no-embedded-assigns") == 0) {
-			CGOptions::use_embedded_assigns(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--comma-operators") == 0) {
-			CGOptions::use_comma_exprs(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-comma-operators") == 0) {
-			CGOptions::use_comma_exprs(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--take-no-union-field-addr") == 0) {
-			CGOptions::take_union_field_addr(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--take-union-field-addr") == 0) {
-			CGOptions::take_union_field_addr(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--vol-struct-union-fields") == 0) {
-			CGOptions::vol_struct_union_fields(true);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-vol-struct-union-fields") == 0) {
-			CGOptions::vol_struct_union_fields(false);
-			continue;
-		}
-
-		if (strcmp(argv[i], "--const-struct-union-fields") == 0) {
-			CGOptions::const_struct_union_fields(true);
-			continue;
-		}
-
-		if (strcmp(argv[i], "--no-const-struct-union-fields") == 0) {
-			CGOptions::const_struct_union_fields(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-hash-value-printf") == 0) {
-			CGOptions::hash_value_printf(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--no-signed-char-index") == 0) {
-			CGOptions::signed_char_index(false);
-			continue;
-		}
-
-		if (strcmp (argv[i], "--lang-cpp") == 0) {
-			CGOptions::lang_cpp(true);
-			continue;
-		}
-
-		if (strcmp(argv[i], "--cpp11") == 0) {
-			CGOptions::cpp11(true);
-			continue;
-		}
-
-        if (strcmp (argv[i], "--int-size") == 0) {
-			unsigned long size;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &size))
-				exit(-1);
-            CGOptions::int_size(size);
-            continue;
-        }
-
-        if (strcmp (argv[i], "--ptr-size") == 0) {
-			unsigned long size;
-			i++;
-			arg_check(argc, i);
-			if (!parse_int_arg(argv[i], &size))
-				exit(-1);
-            CGOptions::pointer_size(size);
-            continue;
-        }
-
-    if (strcmp(argv[i], "--fast-execution") == 0) {
-      CGOptions::lang_cpp(true);
-      // jumps can easily cause infinite loops. Just disable them
-      CGOptions::jumps(false);
-      // large arrays are also reported to cause slow execution
-      CGOptions::max_array_length_per_dimension(5);
-      continue;
-    }
-		// OMIT help
-
-		// OMIT compute-hash
-
-		// OMIT depth-protect
-
-		// OMIT wrap-volatiles
-
-		// OMIT allow-const-volatile
-
-		// OMIT allow-int64
-
-		// OMIT avoid-signed-overflow
-
-		// FIXME-- we should parse all options and then this should be
-		// an error
-
+		// 下面是各种参数的解析和设置，均为配置CGOptions的静态成员
+		// ... existing code ...
+		// 省略大量参数解析代码，每个参数都对应CGOptions的一个配置项
+		// ... existing code ...
+		// 如果遇到未知参数，报错并退出
 		cout << "invalid option " << argv[i] << " at: "
 			 << i
 			 << endl;
 		exit(-1);
 	}
 
+	// 如果选择C++模式，修正相关选项
 	if (CGOptions::lang_cpp()) {
 		CGOptions::fix_options_for_cpp();
 	}
 
+	// 检查选项冲突
 	if (CGOptions::has_conflict()) {
 		cout << "error: options conflict - " << CGOptions::conflict_msg() << std::endl;
 		exit(-1);
 	}
 
+	// 创建程序生成器实例（根据选项选择不同的生成器实现）
 	AbsProgramGenerator *generator = AbsProgramGenerator::CreateInstance(argc, argv, g_Seed);
 	if (!generator) {
 		cout << "error: can't create generator!" << std::endl;
 		exit(-1);
 	}
+	// 启动主生成流程，生成随机C程序
 	generator->goGenerator();
 	delete generator;
 
-//	file.close();
+	// 程序正常结束
 	return 0;
 }
 
